@@ -26,7 +26,7 @@ import ContextInsecureError from "@web-eid/web-eid-library/errors/ContextInsecur
 import config from "../config";
 import HttpResponse from "../models/HttpResponse";
 import { TokenSigningErrorResponse } from "../models/TokenSigning/TokenSigningResponse";
-import { headersToObject } from "../shared/utils";
+import headersToObject from "../shared/utils/headersToObject";
 import tokenSigningResponse from "../shared/tokenSigningResponse";
 import injectPageScript from "./TokenSigning/injectPageScript";
 
@@ -138,10 +138,20 @@ async function fetchProxy<T>(fetchUrl: string, init?: RequestInit): Promise<Http
 }
 
 browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  const isExternalMessage = sender.id !== browser.runtime.id;
+
+  if (isExternalMessage) return false;
+
   if (request.action === "fetch") {
     fetchProxy(request.fetchUrl, request.init)
-      .then(sendResponse)
-      .catch(sendResponse);
+      .then((res) => {
+        console.log("Fetch proxy res", res);
+        sendResponse(res)
+      })
+      .catch((res) => {
+        console.log("Fetch proxy fail", res);
+        sendResponse({ statusText: res.message })
+      });
 
     return true;
   }

@@ -21,7 +21,6 @@
  */
 
 import Action from "@web-eid/web-eid-library/models/Action";
-import TypedMap from "./TypedMap";
 
 export type LibraryMessage
   = StatusRequestMessage
@@ -36,7 +35,8 @@ export interface AuthenticateRequestMessage extends Object {
   action: Action.AUTHENTICATE;
   getAuthChallengeUrl: string;
   postAuthTokenUrl: string;
-  headers: TypedMap<string>;
+  getCorsConfigUrl?: string;
+  headers: Record<string, string>;
   userInteractionTimeout: number;
   serverRequestTimeout: number;
   lang?: string;
@@ -46,7 +46,8 @@ export interface SignRequestMessage extends Object {
   action: Action.SIGN;
   postPrepareSigningUrl: string;
   postFinalizeSigningUrl: string;
-  headers: TypedMap<string>;
+  getCorsConfigUrl?: string;
+  headers: Record<string, string>;
   userInteractionTimeout: number;
   serverRequestTimeout: number;
   lang?: string;

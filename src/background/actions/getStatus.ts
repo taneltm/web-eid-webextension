@@ -51,7 +51,7 @@ export default async function getStatus(): Promise<any> {
 
       action: Action.STATUS_SUCCESS,
     };
-  } catch (error) {
+  } catch (error: any) {
     error.extension = extension;
 
     console.error("Status:", error);

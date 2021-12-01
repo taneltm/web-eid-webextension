@@ -26,10 +26,12 @@ import { deserializeError } from "@web-eid/web-eid-library/utils/errorSerializer
 
 import config from "../../config";
 import Mutex from "../../shared/Mutex";
-import { objectByteSize } from "../../shared/utils";
+import calculateJsonSize from "../../shared/utils/calculateJsonSize";
 import { NativeAppMessage } from "../../models/NativeAppMessage";
 
-type NativeAppPendingRequest = { reject?: Function; resolve?: Function } | null;
+type NativeAppPendingRequest =
+  | { resolve?: (value: any | PromiseLike<any>) => void; reject?: (reason?: any) => void }
+  | null;
 
 export enum NativeAppState {
   UNINITIALIZED,
@@ -89,12 +91,12 @@ export default class NativeAppService {
     this.pending = null;
   }
 
-  async send<T extends any>(message: NativeAppMessage): Promise<T> {
+  async send<T>(message: NativeAppMessage): Promise<T> {
     if (message.command == "quit") return {} as T;
 
     switch (this.state) {
       case NativeAppState.CONNECTED: {
-        const releaseLock: Function = await commandMutex.acquire();
+        const releaseLock = await commandMutex.acquire();
 
         const sendPromise = new Promise<T>((resolve, reject) => {
           this.pending = { resolve, reject };
@@ -111,7 +113,7 @@ export default class NativeAppService {
 
           console.log("Sending message to native app", JSON.stringify(message));
 
-          const messageSize = objectByteSize(message);
+          const messageSize = calculateJsonSize(message);
 
           if (messageSize > config.NATIVE_MESSAGE_MAX_BYTES) {
             throw new Error(`native application message exceeded ${config.NATIVE_MESSAGE_MAX_BYTES} bytes`);

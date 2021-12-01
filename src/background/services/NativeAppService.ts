@@ -28,8 +28,9 @@ import libraryConfig from "@web-eid/web-eid-library/config";
 
 import config from "../../config";
 import { Port } from "../../models/Browser/Runtime";
-import { objectByteSize, throwAfterTimeout } from "../../shared/utils";
 import { NativeAppMessage } from "../../models/NativeAppMessage";
+import { throwAfterTimeout } from "../../shared/utils/timing";
+import calculateJsonSize from "../../shared/utils/calculateJsonSize";
 
 type UnwrappedPromise
   = { resolve: (value?: any) => void; reject: (reason?: any) => void }
@@ -118,7 +119,7 @@ export default class NativeAppService {
     this.disconnectForcefully();
   }
 
-  send<T extends any>(message: NativeAppMessage): Promise<T> {
+  send<T>(message: NativeAppMessage): Promise<T> {
     switch (this.state) {
       case NativeAppState.CONNECTED: {
         return new Promise((resolve, reject) => {
@@ -155,7 +156,7 @@ export default class NativeAppService {
 
           console.log("Sending message to native app", JSON.stringify(message));
 
-          const messageSize = objectByteSize(message);
+          const messageSize = calculateJsonSize(message);
 
           if (messageSize > config.NATIVE_MESSAGE_MAX_BYTES) {
             throw new Error(`native application message exceeded ${config.NATIVE_MESSAGE_MAX_BYTES} bytes`);
@@ -193,7 +194,7 @@ export default class NativeAppService {
 
   nextMessage(timeout: number): Promise<any> {
     return new Promise((resolve, reject) => {
-      let cleanup: Function | null = null;
+      let cleanup: (() => void) | null = null;
       let timer: ReturnType<typeof setTimeout> | null = null;
 
       const onMessageListener = (message: any): void => {

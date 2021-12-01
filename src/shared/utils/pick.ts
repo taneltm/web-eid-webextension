@@ -20,6 +20,21 @@
  * SOFTWARE.
  */
 
-export default interface TypedMap<T> {
-  [key: string]: T;
+/**
+ * Creates an object composed of the picked object properties.
+ *
+ * @param object Object to pick from
+ * @param keys   Keys to pick from the object
+ *
+ * @returns The new object
+ *
+ * @example
+ *   const object = { "a": 1, "b": 2, "c": 3 };
+ *   pick(object, ["a", "b"]);
+ *   // => { "a": 1, "b": 2 }
+ */
+export default function pick(object: any, keys: string[]): object {
+  return Object.keys(object)
+    .filter((objectKey: string) => keys.includes(objectKey))
+    .reduce((acc: Record<string, string>, curr) => (acc[curr] = object[curr], acc), {});
 }

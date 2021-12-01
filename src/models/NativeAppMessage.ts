@@ -29,7 +29,7 @@ export interface NativeAppCommandSign {
 
 export interface NativeAppCommandQuit {
   command: "quit";
-  arguments: {};
+  arguments: Record<string, never>;
 }
 
 

@@ -20,36 +20,36 @@
  * SOFTWARE.
  */
 
-import config from "../config";
-import {
-  TokenSigningResponse,
-  TokenSigningResult,
-} from "../models/TokenSigning/TokenSigningResponse";
+import UnknownError from "@web-eid/web-eid-library/errors/UnknownError";
+
+import { MessageSender } from "../../models/Browser/Runtime";
 
 /**
- * Helper function to compose a token signing response message
+ * Returns the browser tab ID where the PostMessage API's message originated
  *
- * @param result Token signing result from the native application
- * @param nonce  The nonce related to the action
- * @param optional Optional message fields to be included in the response
+ * @param sender PostMessage API's message sender
  *
- * @returns A token signing response object
+ * @returns Tab ID where the message originated
+ * @throws UnknownError when the tab ID is not available
  */
-export default function tokenSigningResponse<T extends TokenSigningResponse>(
-  result: TokenSigningResult,
-  nonce: string,
-  optional?: Record<string, any>
-): T {
-  const response = {
-    nonce,
-    result,
+export function getSenderTabId(sender: MessageSender): number {
+  if (!sender.tab?.id || sender.tab?.id === browser.tabs.TAB_ID_NONE) {
+    throw new UnknownError("invalid sender tab");
+  }
 
-    src:       "background.js",
-    extension: config.VERSION,
-    isWebeid:  true,
+  return sender.tab.id;
+}
 
-    ...(optional ? optional : {}),
-  };
+/**
+ * Returns the URL where the PostMessage API's message originated
+ *
+ * @param sender PostMessage API's message sender
+ * @returns
+ */
+export function getSenderUrl(sender: MessageSender): string {
+  if (!sender.url) {
+    throw new UnknownError("missing sender url");
+  }
 
-  return response as T;
+  return sender.url;
 }

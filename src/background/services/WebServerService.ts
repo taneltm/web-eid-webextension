@@ -25,18 +25,53 @@ import TlsConnectionInsecureError from "@web-eid/web-eid-library/errors/TlsConne
 import TlsConnectionWeakError from "@web-eid/web-eid-library/errors/TlsConnectionWeakError";
 import CertificateChangedError from "@web-eid/web-eid-library/errors/CertificateChangedError";
 import ServerRejectedError from "@web-eid/web-eid-library/errors/ServerRejectedError";
+import ProtocolInsecureError from "@web-eid/web-eid-library/errors/ProtocolInsecureError";
+import OriginMismatchError from "@web-eid/web-eid-library/errors/OriginMismatchError";
+import Action from "@web-eid/web-eid-library/models/Action";
+import MissingParameterError from "@web-eid/web-eid-library/errors/MissingParameterError";
 
 import { OnHeadersReceivedDetails, CertificateInfo, Fingerprint } from "../../models/Browser/WebRequest";
 import HttpResponse from "../../models/HttpResponse";
-
+import { MessageSender } from "../../models/Browser/Runtime";
+import { getSenderTabId, getSenderUrl } from "../../shared/utils/sender";
+import coerceOrigin from "../../shared/utils/coerceOrigin";
 
 export default class WebServerService {
   private fingerprints: Fingerprint[];
-  private tabId: number;
+  private senderTabId: number;
+  private senderOrigin: string;
+  private corsOrigin?: string;
 
-  constructor(tabId: number) {
+  constructor(sender: MessageSender) {
     this.fingerprints = [];
-    this.tabId = tabId;
+    this.senderTabId = getSenderTabId(sender);
+    this.senderOrigin = new URL(getSenderUrl(sender)).origin;
+  }
+
+  async enableCors(action: Action, corsConfigUrl: string): Promise<void> {
+    const originProps: Record<string, string> = {
+      [Action.AUTHENTICATE]: "authUrlOrigin",
+      [Action.SIGN]:         "signUrlOrigin",
+    };
+
+    if (!originProps[action]) throw new Error("invalid action");
+
+    const response   = await this.fetch<Record<string, string>>(coerceOrigin(this.senderOrigin, corsConfigUrl));
+    const corsConfig = response.body;
+
+    const corsOrigin = corsConfig[originProps[action]];
+
+    if (!corsOrigin?.length) {
+      throw new MissingParameterError(`${originProps[action]} required in CORS configuration`);
+    }
+
+    try {
+      new URL(corsOrigin);
+    } catch (e) {
+      throw new Error(`invalid origin in CORS configuration "${corsOrigin}"`);
+    }
+
+    this.corsOrigin = new URL(corsOrigin).origin;
   }
 
   hasCertificateChanged(): boolean {
@@ -47,6 +82,12 @@ export default class WebServerService {
     let certificateInfo: CertificateInfo | null;
     let fetchError: Error | null = null;
     let hasWebRequestPermission = false;
+
+    fetchUrl = coerceOrigin(this.corsOrigin || this.senderOrigin, fetchUrl);
+
+    if (!fetchUrl.toLocaleLowerCase().startsWith("https://")) {
+      throw new ProtocolInsecureError(`HTTPS required for ${fetchUrl}`);
+    }
 
     try {
       hasWebRequestPermission = await browser.permissions.contains({
@@ -71,8 +112,20 @@ export default class WebServerService {
         { rawDER: true }
       );
 
-      console.log("Inspecting webRequest securityInfo");
+      const accessControlAllowOrigin = details.responseHeaders?.find(
+        (header) => header.name.toLocaleLowerCase() == "access-control-allow-origin"
+      )?.value
 
+      if (this.corsOrigin && this.senderOrigin !== accessControlAllowOrigin) {
+        fetchError = new OriginMismatchError(
+          `website origin ${this.senderOrigin} does not match Access-Control-Allow-Origin: ${accessControlAllowOrigin}`
+        );
+
+        return { cancel: true };
+      }
+
+      console.log("Inspecting webRequest securityInfo");
+      /*
       switch (securityInfo.state) {
         case "secure": {
           certificateInfo = securityInfo.certificates[0];
@@ -108,24 +161,53 @@ export default class WebServerService {
           fetchError = new Error("Unexpected connection security state");
           return { cancel: true };
       }
+      */
     };
 
     if (hasWebRequestPermission) {
+      /*
+      browser.webRequest.onBeforeSendHeaders.addListener(
+        (details: any) => {
+          return {
+            requestHeaders: details.requestHeaders.map(((header: any) => {
+              return (
+                header.name.toLowerCase() == "origin"
+                  ? { ...header, value: this.senderOrigin }
+                  : header
+              );
+            }))
+          }
+        },
+        { urls: [fetchUrl] },
+        ["blocking", "requestHeaders"]
+      );
+      */
+
+
       browser.webRequest.onHeadersReceived.addListener(
         onHeadersReceivedListener,
         { urls: [fetchUrl] },
-        ["blocking"]
+        ["blocking", "responseHeaders"]
       );
     }
 
     try {
       const response = await browser.tabs.sendMessage(
-        this.tabId,
+        this.senderTabId,
         {
           action: "fetch",
 
           fetchUrl,
-          init,
+
+          init: {
+            ...init,
+
+            ...(
+              this.corsOrigin
+                ? { mode: "cors",        credentials: "include"     }
+                : { mode: "same-origin", credentials: "same-origin" }
+            ),
+          },
         }
       ) as HttpResponse<T>;
 
@@ -157,7 +239,7 @@ export default class WebServerService {
       };
 
       if (!ok) {
-        fetchError = new ServerRejectedError();
+        fetchError = fetchError || new ServerRejectedError();
         Object.assign(fetchError, {
           response: {
             ok,

@@ -21,24 +21,24 @@
  */
 
 import Action from "@web-eid/web-eid-library/models/Action";
-import ProtocolInsecureError from "@web-eid/web-eid-library/errors/ProtocolInsecureError";
 import UserTimeoutError from "@web-eid/web-eid-library/errors/UserTimeoutError";
 import ServerTimeoutError from "@web-eid/web-eid-library/errors/ServerTimeoutError";
-import OriginMismatchError from "@web-eid/web-eid-library/errors/OriginMismatchError";
 import { serializeError } from "@web-eid/web-eid-library/utils/errorSerializer";
 
 import NativeAppService from "../services/NativeAppService";
 import WebServerService from "../services/WebServerService";
-import TypedMap from "../../models/TypedMap";
 import HttpResponse from "../../models/HttpResponse";
-import { pick, throwAfterTimeout, isSameOrigin } from "../../shared/utils";
-import ByteArray from "../../shared/ByteArray";
 import { MessageSender } from "../../models/Browser/Runtime";
+import ByteArray from "../../shared/ByteArray";
+import pick from "../../shared/utils/pick";
+import { throwAfterTimeout } from "../../shared/utils/timing";
+import { getSenderUrl } from "../../shared/utils/sender";
 
 export default async function authenticate(
   getAuthChallengeUrl: string,
   postAuthTokenUrl: string,
-  headers: TypedMap<string>,
+  getCorsConfigUrl: string | null,
+  headers: Record<string, string>,
   userInteractionTimeout: number,
   serverRequestTimeout: number,
   sender: MessageSender,
@@ -48,24 +48,12 @@ export default async function authenticate(
   let nativeAppService: NativeAppService | undefined;
 
   try {
-    if (!getAuthChallengeUrl.startsWith("https:")) {
-      throw new ProtocolInsecureError(`HTTPS required for getAuthChallengeUrl ${getAuthChallengeUrl}`);
-    }
-
-    if (!postAuthTokenUrl.startsWith("https:")) {
-      throw new ProtocolInsecureError(`HTTPS required for postAuthTokenUrl ${postAuthTokenUrl}`);
-    }
-
-    if (!isSameOrigin(getAuthChallengeUrl, postAuthTokenUrl)) {
-      throw new OriginMismatchError();
-    }
-
-    if (!sender.tab?.id || sender.tab?.id === browser.tabs.TAB_ID_NONE) {
-      throw new Error("invalid sender tab");
-    }
-
-    webServerService = new WebServerService(sender.tab.id);
+    webServerService = new WebServerService(sender);
     nativeAppService = new NativeAppService();
+
+    if (getCorsConfigUrl) {
+      await webServerService.enableCors(Action.AUTHENTICATE, getCorsConfigUrl);
+    }
 
     const nativeAppStatus = await nativeAppService.connect();
 
@@ -93,7 +81,7 @@ export default async function authenticate(
 
         arguments: {
           "nonce":  response.body.nonce,
-          "origin": (new URL(response.url)).origin,
+          "origin": (new URL(getSenderUrl(sender))).origin,
 
           "origin-cert": (
             response.certificateInfo?.rawDER

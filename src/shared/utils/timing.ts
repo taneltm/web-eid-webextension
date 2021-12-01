@@ -20,36 +20,34 @@
  * SOFTWARE.
  */
 
-import config from "../config";
-import {
-  TokenSigningResponse,
-  TokenSigningResult,
-} from "../models/TokenSigning/TokenSigningResponse";
+/**
+ * Sleeps for a specified time before resolving the returned promise.
+ *
+ * @param milliseconds Time in milliseconds until the promise is resolved
+ *
+ * @returns Empty promise
+ */
+export function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(), milliseconds);
+  });
+}
 
 /**
- * Helper function to compose a token signing response message
+ * Throws an error after a specified time has passed.
  *
- * @param result Token signing result from the native application
- * @param nonce  The nonce related to the action
- * @param optional Optional message fields to be included in the response
+ * Useful in combination with Promise.race(...)
  *
- * @returns A token signing response object
+ * @param milliseconds Time in milliseconds until the promise is rejected
+ * @param error Error object which will be used to reject the promise
+ *
+ * @example
+ *   await Promise.race([
+ *     doAsyncOperation(),
+ *     throwAfterTimeout(3600, new TimeoutError()),
+ *   ])
  */
-export default function tokenSigningResponse<T extends TokenSigningResponse>(
-  result: TokenSigningResult,
-  nonce: string,
-  optional?: Record<string, any>
-): T {
-  const response = {
-    nonce,
-    result,
-
-    src:       "background.js",
-    extension: config.VERSION,
-    isWebeid:  true,
-
-    ...(optional ? optional : {}),
-  };
-
-  return response as T;
+export async function throwAfterTimeout(milliseconds: number, error: Error): Promise<void> {
+  await sleep(milliseconds);
+  throw error;
 }

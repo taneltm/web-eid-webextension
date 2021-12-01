@@ -20,36 +20,16 @@
  * SOFTWARE.
  */
 
-import config from "../config";
-import {
-  TokenSigningResponse,
-  TokenSigningResult,
-} from "../models/TokenSigning/TokenSigningResponse";
-
 /**
- * Helper function to compose a token signing response message
+ * Calculates the size of an object's JSON representation in bytes
  *
- * @param result Token signing result from the native application
- * @param nonce  The nonce related to the action
- * @param optional Optional message fields to be included in the response
+ * @param object Any JSON stringifyable object
  *
- * @returns A token signing response object
+ * @returns Size in bytes
  */
-export default function tokenSigningResponse<T extends TokenSigningResponse>(
-  result: TokenSigningResult,
-  nonce: string,
-  optional?: Record<string, any>
-): T {
-  const response = {
-    nonce,
-    result,
+export default function calculateJsonSize(object: any): number {
+  const objectString = JSON.stringify(object);
+  const objectStringBlob = new Blob([objectString]);
 
-    src:       "background.js",
-    extension: config.VERSION,
-    isWebeid:  true,
-
-    ...(optional ? optional : {}),
-  };
-
-  return response as T;
+  return objectStringBlob.size;
 }

@@ -20,8 +20,6 @@
  * SOFTWARE.
  */
 
-import TypedMap from "../models/TypedMap";
-
 /**
  * Transforms the Fetch API Header object to plain JSON.stringify-able object type.
  *
@@ -40,8 +38,8 @@ import TypedMap from "../models/TypedMap";
  *   //   "x-powered-by":   "Express"
  *   // }
  */
-export function headersToObject(headers: Headers): TypedMap<string> {
-  function reducer(acc: TypedMap<string>, curr: Array<string>): TypedMap<string> {
+export default function headersToObject(headers: Headers): Record<string, string> {
+  function reducer(acc: Record<string, string>, curr: Array<string>): Record<string, string> {
     if (typeof curr[0] == "string") {
       acc[curr[0]] = curr[1];
     }
@@ -49,51 +47,7 @@ export function headersToObject(headers: Headers): TypedMap<string> {
   }
 
   const headersArray = [...headers.entries()];
-  const headersMap   = headersArray.reduce(reducer, {});
+  const headersMap = headersArray.reduce(reducer, {});
 
   return headersMap;
-}
-
-/**
- * Creates an object composed of the picked object properties.
- *
- * @param object Object to pick from
- * @param keys   Keys to pick from the object
- *
- * @returns The new object
- *
- * @example
- *   const object = { "a": 1, "b": 2, "c": 3 };
- *   pick(object, ["a", "b"]);
- *   // => { "a": 1, "b": 2 }
- */
-export function pick(object: any, keys: string[]): object {
-  return Object.keys(object)
-    .filter((objectKey: string) => keys.includes(objectKey))
-    .reduce((acc: TypedMap<string>, curr) => (acc[curr] = object[curr], acc), {});
-}
-
-export function sleep(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(), milliseconds);
-  });
-}
-
-export async function throwAfterTimeout(milliseconds: number, error: Error): Promise<void> {
-  await sleep(milliseconds);
-  throw error;
-}
-
-export function objectByteSize(object: any): number {
-  const objectString     = JSON.stringify(object);
-  const objectStringBlob = new Blob([objectString]);
-
-  return objectStringBlob.size;
-}
-
-export function isSameOrigin(url1: string, url2: string): boolean {
-  const origin1 = new URL(url1).origin;
-  const origin2 = new URL(url2).origin;
-
-  return origin1 === origin2;
 }

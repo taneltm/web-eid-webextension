@@ -21,23 +21,23 @@
  */
 
 import Action from "@web-eid/web-eid-library/models/Action";
-import ProtocolInsecureError from "@web-eid/web-eid-library/errors/ProtocolInsecureError";
 import UserTimeoutError from "@web-eid/web-eid-library/errors/UserTimeoutError";
 import ServerTimeoutError from "@web-eid/web-eid-library/errors/ServerTimeoutError";
-import OriginMismatchError from "@web-eid/web-eid-library/errors/OriginMismatchError";
 import { serializeError } from "@web-eid/web-eid-library/utils/errorSerializer";
 
 import NativeAppService from "../services/NativeAppService";
 import WebServerService from "../services/WebServerService";
 import HttpResponse from "../../models/HttpResponse";
-import TypedMap from "../../models/TypedMap";
-import { pick, throwAfterTimeout, isSameOrigin } from "../../shared/utils";
 import { MessageSender } from "../../models/Browser/Runtime";
+import { throwAfterTimeout } from "../../shared/utils/timing";
+import pick from "../../shared/utils/pick";
+import { getSenderUrl } from "../../shared/utils/sender";
 
 export default async function sign(
   postPrepareSigningUrl: string,
   postFinalizeSigningUrl: string,
-  headers: TypedMap<string>,
+  getCorsConfigUrl: string | null,
+  headers: Record<string, string>,
   userInteractionTimeout: number,
   serverRequestTimeout: number,
   sender: MessageSender,
@@ -47,24 +47,12 @@ export default async function sign(
   let nativeAppService: NativeAppService | undefined;
 
   try {
-    if (!postPrepareSigningUrl.startsWith("https:")) {
-      throw new ProtocolInsecureError(`HTTPS required for postPrepareSigningUrl ${postPrepareSigningUrl}`);
-    }
-
-    if (!postFinalizeSigningUrl.startsWith("https:")) {
-      throw new ProtocolInsecureError(`HTTPS required for postFinalizeSigningUrl ${postFinalizeSigningUrl}`);
-    }
-
-    if (!isSameOrigin(postPrepareSigningUrl, postFinalizeSigningUrl)) {
-      throw new OriginMismatchError();
-    }
-
-    if (!sender.tab?.id || sender.tab?.id === browser.tabs.TAB_ID_NONE) {
-      throw new Error("invalid sender tab");
-    }
-
-    webServerService = new WebServerService(sender.tab.id);
+    webServerService = new WebServerService(sender);
     nativeAppService = new NativeAppService();
+
+    if (getCorsConfigUrl) {
+      await webServerService.enableCors(Action.SIGN, getCorsConfigUrl);
+    }
 
     let nativeAppStatus = await nativeAppService.connect();
 
@@ -139,7 +127,7 @@ export default async function sign(
         arguments: {
           "doc-hash":      prepareDocumentResult.body.hash,
           "hash-algo":     prepareDocumentResult.body.algorithm,
-          "origin":        (new URL(postPrepareSigningUrl)).origin,
+          "origin":        (new URL(getSenderUrl(sender))).origin,
           "user-eid-cert": certificate,
 
           ...(lang ? { lang } : {}),

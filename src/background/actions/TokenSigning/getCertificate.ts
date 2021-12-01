@@ -30,7 +30,7 @@ import {
   TokenSigningCertResponse,
   TokenSigningErrorResponse,
 } from "../../../models/TokenSigning/TokenSigningResponse";
-import { throwAfterTimeout } from "../../../shared/utils";
+import { throwAfterTimeout } from "../../../shared/utils/timing";
 import errorToResponse from "./errorToResponse";
 import threeLetterLanguageCodes from "./threeLetterLanguageCodes";
 

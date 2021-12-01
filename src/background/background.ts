@@ -38,6 +38,7 @@ async function onAction(message: LibraryMessage, sender: MessageSender): Promise
       return await authenticate(
         message.getAuthChallengeUrl,
         message.postAuthTokenUrl,
+        message.getCorsConfigUrl || null,
         message.headers,
         message.userInteractionTimeout || libraryConfig.DEFAULT_USER_INTERACTION_TIMEOUT,
         message.serverRequestTimeout   || libraryConfig.DEFAULT_SERVER_REQUEST_TIMEOUT,
@@ -49,6 +50,7 @@ async function onAction(message: LibraryMessage, sender: MessageSender): Promise
       return await sign(
         message.postPrepareSigningUrl,
         message.postFinalizeSigningUrl,
+        message.getCorsConfigUrl || null,
         message.headers,
         message.userInteractionTimeout || libraryConfig.DEFAULT_USER_INTERACTION_TIMEOUT,
         message.serverRequestTimeout   || libraryConfig.DEFAULT_SERVER_REQUEST_TIMEOUT,
